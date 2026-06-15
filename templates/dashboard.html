@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — NAD{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="mb-0 fw-bold">Live Dashboard</h4>
+    <small class="text-muted">Network Anomaly Detection System</small>
+  </div>
+  <button class="btn btn-sm btn-outline-secondary" onclick="simulateTraffic()">
+    <i class="fas fa-bolt me-1"></i>Simulate Traffic
+  </button>
+</div>
+
+<!-- Stat cards -->
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="text-muted small mb-1"><i class="fas fa-triangle-exclamation me-1 text-danger"></i>Total Alerts</div>
+      <div class="value text-danger" id="totalAlerts">{{ stats.total }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="text-muted small mb-1"><i class="fas fa-skull-crossbones me-1" style="color:#ff6b6b"></i>Critical</div>
+      <div class="value" style="color:#ff6b6b" id="critAlerts">{{ stats.by_severity.get('CRITICAL', 0) }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="text-muted small mb-1"><i class="fas fa-fire me-1 text-warning"></i>High</div>
+      <div class="value text-warning" id="highAlerts">{{ stats.by_severity.get('HIGH', 0) }}</div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="text-muted small mb-1"><i class="fas fa-check-circle me-1 text-success"></i>RF Accuracy</div>
+      <div class="value text-success">{{ (metrics.get('Random Forest', {}).get('accuracy', 0) * 100) | round(1) }}%</div>
+    </div>
+  </div>
+</div>
+
+<!-- Model performance summary -->
+{% if metrics %}
+<div class="row g-3 mb-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><i class="fas fa-robot me-2"></i>Model Performance Summary</div>
+      <div class="card-body p-0">
+        <table class="table mb-0">
+          <thead><tr><th>Model</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th><th>ROC-AUC</th></tr></thead>
+          <tbody>
+            {% for model_name, m in metrics.items() %}
+            <tr>
+              <td><strong>{{ model_name }}</strong></td>
+              <td>{{ (m.accuracy * 100)|round(1) }}%</td>
+              <td>{{ (m.precision * 100)|round(1) }}%</td>
+              <td>{{ (m.recall * 100)|round(1) }}%</td>
+              <td><span class="badge bg-primary">{{ (m.f1 * 100)|round(1) }}%</span></td>
+              <td>{{ m.roc_auc }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Recent alerts + simulation result -->
+<div class="row g-3">
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between"><span><i class="fas fa-bell me-2"></i>Recent Alerts</span><a href="/alerts" class="small text-primary">View all →</a></div>
+      <div class="card-body p-0">
+        <table class="table mb-0" id="alertTable">
+          <thead><tr><th>Time</th><th>Type</th><th>Severity</th><th>Confidence</th></tr></thead>
+          <tbody id="alertBody">
+            <tr><td colspan="4" class="text-center text-muted py-3">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header"><i class="fas fa-radar me-2"></i>Simulation Result</div>
+      <div class="card-body" id="simResult">
+        <p class="text-muted small">Click "Simulate Traffic" to test a random network record.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadAlerts() {
+  const res = await fetch('/api/alerts?n=10');
+  const alerts = await res.json();
+  const tbody = document.getElementById('alertBody');
+  if (!alerts.length) { tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No alerts yet.</td></tr>'; return; }
+  tbody.innerHTML = alerts.map(a => {
+    const sev = a.severity.toLowerCase();
+    const time = new Date(a.timestamp).toLocaleTimeString();
+    return `<tr class="${a.severity==='CRITICAL'||a.severity==='HIGH' ? 'anomaly-row' : ''}">
+      <td class="small text-muted">${time}</td>
+      <td class="small">${a.anomaly_type}</td>
+      <td><span class="badge badge-${sev}">${a.severity}</span></td>
+      <td class="small">${a.confidence}%</td>
+    </tr>`;
+  }).join('');
+}
+
+async function simulateTraffic() {
+  const btn = document.querySelector('button[onclick="simulateTraffic()"]');
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Simulating…';
+  try {
+    const res = await fetch('/api/simulate');
+    const d = await res.json();
+    const isAnomaly = d.prediction === 1;
+    const color = isAnomaly ? '#dc3545' : '#198754';
+    const icon  = isAnomaly ? 'fa-triangle-exclamation' : 'fa-check-circle';
+    document.getElementById('simResult').innerHTML = `
+      <div class="text-center mb-3">
+        <i class="fas ${icon} fa-2x" style="color:${color}"></i>
+        <h5 class="mt-2" style="color:${color}">${d.label}</h5>
+        <div class="small text-muted">Simulated: ${d.simulated_type}</div>
+      </div>
+      <div class="small">
+        <div class="d-flex justify-content-between mb-1"><span>Confidence</span><strong>${d.confidence}%</strong></div>
+        ${isAnomaly ? `<div class="d-flex justify-content-between mb-1"><span>Type</span><strong>${d.alert.anomaly_type}</strong></div>
+        <div class="d-flex justify-content-between"><span>Severity</span><strong style="color:${color}">${d.alert.severity}</strong></div>` : ''}
+        <hr style="border-color:var(--border)">
+        <div class="text-muted" style="font-size:.75rem">
+          Bytes Sent: ${d.record.bytes_sent.toLocaleString()} | Conns: ${d.record.num_connections} | Logins Failed: ${d.record.failed_logins}
+        </div>
+      </div>`;
+    loadAlerts();
+    // Update counters
+    const stats = await (await fetch('/api/stats')).json();
+    document.getElementById('totalAlerts').textContent = stats.total;
+    document.getElementById('critAlerts').textContent = stats.by_severity['CRITICAL'] || 0;
+    document.getElementById('highAlerts').textContent = stats.by_severity['HIGH'] || 0;
+  } finally {
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-bolt me-1"></i>Simulate Traffic';
+  }
+}
+
+loadAlerts();
+setInterval(loadAlerts, 15000);
+</script>
+{% endblock %}

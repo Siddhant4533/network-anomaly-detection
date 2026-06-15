@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Predict — NAD{% endblock %}
+
+{% block content %}
+<h4 class="fw-bold mb-1">Predict Anomaly</h4>
+<p class="text-muted small mb-4">Submit a single network traffic record or upload a CSV batch.</p>
+
+<div class="row g-4">
+  <!-- Single prediction -->
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header"><i class="fas fa-search me-2"></i>Single Record Prediction</div>
+      <div class="card-body">
+        <div class="row g-2">
+          {% set fields = [
+            ('duration','Duration (s)', '2.5'),
+            ('bytes_sent','Bytes Sent', '5000'),
+            ('bytes_received','Bytes Received', '8000'),
+            ('packets_sent','Packets Sent', '20'),
+            ('packets_received','Packets Received', '30'),
+            ('port','Port', '80'),
+            ('protocol','Protocol (0=TCP,1=UDP,2=ICMP)', '0'),
+            ('failed_logins','Failed Logins', '0'),
+            ('num_connections','Num Connections', '10')
+          ] %}
+          {% for name, label, placeholder in fields %}
+          <div class="col-6">
+            <label class="form-label small text-muted">{{ label }}</label>
+            <input type="number" class="form-control form-control-sm" id="{{ name }}" placeholder="{{ placeholder }}" value="{{ placeholder }}">
+          </div>
+          {% endfor %}
+        </div>
+        <button class="btn btn-primary btn-sm mt-3 w-100" onclick="predictSingle()">
+          <i class="fas fa-play me-1"></i>Analyze Record
+        </button>
+        <div id="singleResult" class="mt-3"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Batch prediction -->
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header"><i class="fas fa-file-csv me-2"></i>Batch Prediction (CSV)</div>
+      <div class="card-body">
+        <p class="text-muted small">Upload a CSV with columns: <code>duration, bytes_sent, bytes_received, packets_sent, packets_received, port, protocol, failed_logins, num_connections</code></p>
+        <input type="file" class="form-control form-control-sm mb-3" id="csvFile" accept=".csv">
+        <button class="btn btn-primary btn-sm w-100" onclick="predictBatch()">
+          <i class="fas fa-upload me-1"></i>Upload & Analyze
+        </button>
+        <div id="batchResult" class="mt-3"></div>
+      </div>
+    </div>
+
+    <!-- Preset examples -->
+    <div class="card mt-3">
+      <div class="card-header"><i class="fas fa-flask me-2"></i>Quick Examples</div>
+      <div class="card-body d-flex gap-2 flex-wrap">
+        <button class="btn btn-sm btn-outline-success" onclick="loadExample('normal')">Normal Traffic</button>
+        <button class="btn btn-sm btn-outline-danger" onclick="loadExample('dos')">DoS Attack</button>
+        <button class="btn btn-sm btn-outline-warning" onclick="loadExample('portscan')">Port Scan</button>
+        <button class="btn btn-sm btn-outline-danger" onclick="loadExample('brute')">Brute Force</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const EXAMPLES = {
+  normal:   {duration:5.2, bytes_sent:4800, bytes_received:7900, packets_sent:18, packets_received:28, port:443, protocol:0, failed_logins:0, num_connections:8},
+  dos:      {duration:0.1, bytes_sent:120000, bytes_received:200, packets_sent:600, packets_received:3, port:80, protocol:0, failed_logins:0, num_connections:250},
+  portscan: {duration:0.05, bytes_sent:180, bytes_received:80, packets_sent:2, packets_received:1, port:8443, protocol:0, failed_logins:0, num_connections:180},
+  brute:    {duration:1.8, bytes_sent:280, bytes_received:190, packets_sent:4, packets_received:3, port:22, protocol:0, failed_logins:25, num_connections:45},
+};
+
+function loadExample(type) {
+  const e = EXAMPLES[type];
+  Object.keys(e).forEach(k => { const el = document.getElementById(k); if(el) el.value = e[k]; });
+}
+
+async function predictSingle() {
+  const fields = ['duration','bytes_sent','bytes_received','packets_sent','packets_received','port','protocol','failed_logins','num_connections'];
+  const record = {};
+  fields.forEach(f => record[f] = parseFloat(document.getElementById(f).value) || 0);
+
+  const btn = document.querySelector('button[onclick="predictSingle()"]');
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Analyzing…';
+
+  try {
+    const res = await fetch('/predict', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(record) });
+    const d = await res.json();
+    renderSingleResult(d);
+  } finally {
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-play me-1"></i>Analyze Record';
+  }
+}
+
+function renderSingleResult(d) {
+  if (d.error) { document.getElementById('singleResult').innerHTML = `<div class="alert alert-danger small">${d.error}</div>`; return; }
+  const isAnomaly = d.prediction === 1;
+  const color = isAnomaly ? '#dc3545' : '#198754';
+  document.getElementById('singleResult').innerHTML = `
+    <div class="p-3 rounded" style="background:${isAnomaly?'rgba(220,53,69,.1)':'rgba(25,135,84,.1)'}; border:1px solid ${color}">
+      <div class="d-flex justify-content-between align-items-center">
+        <strong style="color:${color}"><i class="fas ${isAnomaly?'fa-triangle-exclamation':'fa-check-circle'} me-1"></i>${d.label}</strong>
+        <span class="small text-muted">Confidence: <strong>${d.confidence}%</strong></span>
+      </div>
+      ${isAnomaly && d.alert ? `<hr style="border-color:var(--border); margin:.5rem 0">
+        <div class="small">Type: <strong>${d.alert.anomaly_type}</strong> | Severity: <strong style="color:${color}">${d.alert.severity}</strong></div>` : ''}
+    </div>`;
+}
+
+async function predictBatch() {
+  const file = document.getElementById('csvFile').files[0];
+  if (!file) { alert('Please select a CSV file.'); return; }
+  const form = new FormData(); form.append('file', file);
+  const btn = document.querySelector('button[onclick="predictBatch()"]');
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Processing…';
+  try {
+    const res = await fetch('/predict_batch', { method:'POST', body: form });
+    const d = await res.json();
+    if (d.error) { document.getElementById('batchResult').innerHTML = `<div class="alert alert-danger small">${d.error}</div>`; return; }
+    const pct = (d.anomalies/d.total*100).toFixed(1);
+    document.getElementById('batchResult').innerHTML = `
+      <div class="p-3 rounded border" style="border-color:var(--border)!important">
+        <div class="row text-center g-2">
+          <div class="col-4"><div class="small text-muted">Total</div><strong>${d.total}</strong></div>
+          <div class="col-4"><div class="small text-muted">Anomalies</div><strong class="text-danger">${d.anomalies}</strong></div>
+          <div class="col-4"><div class="small text-muted">Normal</div><strong class="text-success">${d.normal}</strong></div>
+        </div>
+        <div class="mt-2">
+          <div class="progress" style="height:8px">
+            <div class="progress-bar bg-danger" style="width:${pct}%"></div>
+            <div class="progress-bar bg-success" style="width:${100-pct}%"></div>
+          </div>
+          <div class="small text-muted mt-1 text-center">${pct}% anomalous traffic detected</div>
+        </div>
+      </div>`;
+  } finally {
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-upload me-1"></i>Upload & Analyze';
+  }
+}
+</script>
+{% endblock %}

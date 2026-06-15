@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Model Metrics — NAD{% endblock %}
+
+{% block content %}
+<h4 class="fw-bold mb-1">Model Performance Metrics</h4>
+<p class="text-muted small mb-4">Comparison of all trained anomaly detection models.</p>
+
+{% if not metrics %}
+<div class="card">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="fas fa-robot fa-2x mb-3"></i>
+    <p>No metrics available. Run <code>python train.py</code> to train models first.</p>
+  </div>
+</div>
+{% else %}
+
+<!-- Metrics table -->
+<div class="card mb-4">
+  <div class="card-header"><i class="fas fa-table me-2"></i>Metrics Comparison</div>
+  <div class="card-body p-0">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th>Model</th>
+          <th>Accuracy</th>
+          <th>Precision</th>
+          <th>Recall</th>
+          <th>F1 Score</th>
+          <th>ROC-AUC</th>
+          <th>CV F1 (mean ± std)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for name, m in metrics.items() %}
+        <tr>
+          <td><strong>{{ name }}</strong></td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              {{ (m.accuracy*100)|round(1) }}%
+              <div class="progress flex-grow-1" style="height:5px">
+                <div class="progress-bar bg-primary" style="width:{{ (m.accuracy*100)|round(0) }}%"></div>
+              </div>
+            </div>
+          </td>
+          <td>{{ (m.precision*100)|round(1) }}%</td>
+          <td>{{ (m.recall*100)|round(1) }}%</td>
+          <td><span class="badge bg-primary">{{ (m.f1*100)|round(1) }}%</span></td>
+          <td>{{ m.roc_auc }}</td>
+          <td class="small text-muted">
+            {% if m.cv_f1_mean is defined %}
+              {{ (m.cv_f1_mean*100)|round(1) }}% ± {{ (m.cv_f1_std*100)|round(1) }}%
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Confusion matrices -->
+<div class="row g-3 mb-4">
+  {% for name in metrics.keys() %}
+  {% set slug = name.lower().replace(' ', '_') %}
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header small">Confusion Matrix — {{ name }}</div>
+      <div class="card-body text-center p-2">
+        <img src="/static/reports/cm_{{ slug }}.png" class="img-fluid rounded" alt="{{ name }} CM"
+             onerror="this.parentElement.innerHTML='<p class=\'text-muted small\'>Plot not available</p>'">
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Feature importance -->
+<div class="row g-3">
+  {% for name in ['Random Forest', 'Gradient Boosting'] %}
+  {% set slug = name.lower().replace(' ', '_') %}
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header small">Feature Importance — {{ name }}</div>
+      <div class="card-body p-2">
+        <img src="/static/reports/fi_{{ slug }}.png" class="img-fluid rounded" alt="{{ name }} FI"
+             onerror="this.parentElement.innerHTML='<p class=\'text-muted small\'>Plot not available</p>'">
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endif %}
+{% endblock %}

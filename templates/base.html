@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}Network Anomaly Detection{% endblock %}</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet"/>
+  <style>
+    :root {
+      --primary: #0d6efd;
+      --danger:  #dc3545;
+      --success: #198754;
+      --warning: #ffc107;
+      --dark:    #1a1d23;
+      --card-bg: #22262e;
+      --border:  #2e3340;
+      --text-muted: #8a91a0;
+    }
+    body { background: var(--dark); color: #e2e8f0; font-family: 'Segoe UI', sans-serif; }
+    .sidebar { background: #13161c; min-height: 100vh; width: 220px; position: fixed; top:0; left:0; padding-top:1rem; z-index:100; border-right:1px solid var(--border); }
+    .sidebar .brand { font-size:1rem; font-weight:700; color:#fff; padding:1rem 1.25rem 1.5rem; border-bottom:1px solid var(--border); }
+    .sidebar .brand span { color: var(--primary); }
+    .sidebar .nav-link { color: var(--text-muted); padding:.65rem 1.25rem; font-size:.875rem; border-radius:6px; margin:2px 8px; transition:all .2s; }
+    .sidebar .nav-link:hover, .sidebar .nav-link.active { background:#1e2330; color:#fff; }
+    .sidebar .nav-link i { width:18px; margin-right:8px; }
+    .main-content { margin-left:220px; padding:1.5rem 2rem; }
+    .card { background: var(--card-bg); border:1px solid var(--border); border-radius:10px; }
+    .card-header { background: transparent; border-bottom:1px solid var(--border); font-weight:600; }
+    .stat-card { background: var(--card-bg); border:1px solid var(--border); border-radius:10px; padding:1.25rem; }
+    .stat-card .value { font-size:2rem; font-weight:700; }
+    .badge-critical { background:#7b0000; color:#ff6b6b; }
+    .badge-high     { background:#6b3600; color:#ffaa6b; }
+    .badge-medium   { background:#5c4a00; color:#ffd76b; }
+    .badge-low      { background:#1a4a1a; color:#6bff6b; }
+    .table { color: #e2e8f0; }
+    .table thead th { border-color: var(--border); color: var(--text-muted); font-size:.8rem; text-transform:uppercase; }
+    .table td { border-color: var(--border); vertical-align:middle; }
+    .form-control, .form-select { background:#13161c; border:1px solid var(--border); color:#e2e8f0; }
+    .form-control:focus, .form-select:focus { background:#13161c; border-color: var(--primary); color:#e2e8f0; box-shadow:none; }
+    .btn-primary { background: var(--primary); border:none; }
+    .pulse { animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+    .anomaly-row { background: rgba(220,53,69,.08) !important; }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="brand"><i class="fas fa-shield-halved" style="color:var(--primary)"></i> <span>NAD</span> System</div>
+  <ul class="nav flex-column mt-2">
+    <li class="nav-item"><a class="nav-link {% if request.endpoint=='dashboard' %}active{% endif %}" href="/"><i class="fas fa-gauge-high"></i>Dashboard</a></li>
+    <li class="nav-item"><a class="nav-link {% if request.endpoint=='predict_page' %}active{% endif %}" href="/predict_page"><i class="fas fa-search"></i>Predict</a></li>
+    <li class="nav-item"><a class="nav-link {% if request.endpoint=='alerts_page' %}active{% endif %}" href="/alerts"><i class="fas fa-bell"></i>Alerts</a></li>
+    <li class="nav-item"><a class="nav-link {% if request.endpoint=='metrics_page' %}active{% endif %}" href="/metrics"><i class="fas fa-chart-bar"></i>Model Metrics</a></li>
+  </ul>
+</div>
+
+<div class="main-content">
+  {% block content %}{% endblock %}
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

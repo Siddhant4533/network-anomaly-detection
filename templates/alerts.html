@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Alerts — NAD{% endblock %}
+
+{% block content %}
+<h4 class="fw-bold mb-1">Alert Log</h4>
+<p class="text-muted small mb-4">All detected network anomalies with severity classification.</p>
+
+{% if not alerts %}
+<div class="card">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="fas fa-bell-slash fa-2x mb-3"></i>
+    <p>No alerts generated yet. Use the Dashboard to simulate traffic or submit predictions.</p>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Severity</th>
+          <th>Type</th>
+          <th>Confidence</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in alerts %}
+        <tr class="{% if a.severity in ['CRITICAL','HIGH'] %}anomaly-row{% endif %}">
+          <td class="small text-muted">{{ a.timestamp[:19].replace('T',' ') }}</td>
+          <td>
+            <span class="badge badge-{{ a.severity.lower() }}">{{ a.severity }}</span>
+          </td>
+          <td class="small"><strong>{{ a.anomaly_type }}</strong></td>
+          <td class="small">{{ a.confidence }}%</td>
+          <td class="small text-muted">
+            Bytes: {{ a.record.bytes_sent | default('N/A') }} |
+            Conns: {{ a.record.num_connections | default('N/A') }} |
+            Logins: {{ a.record.failed_logins | default('N/A') }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
